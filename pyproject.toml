@@ -1,0 +1,16 @@
+[project]
+name = "shai"
+version = "0.1.0"
+description = "A natural language shell assistant"
+authors = [
+    {name = "Tim Kalan", email= "timkalan99@gmail.com"},
+]
+dependencies = [
+    "openai",
+    "pydantic",
+    "python-dotenv",
+    "typer",
+]
+
+[project.scripts]
+shai = "shai.cli:app"
