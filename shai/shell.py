@@ -19,13 +19,12 @@ class ShellExecutor:
             return self._handle_cd(command)
 
         if self._is_unsupported(command):
-            print(f"⚠️ Skipping unsupported shell command: {command}")
-            return
+            raise ValueError(f"Unsupported command: {command}")
 
         try:
             subprocess.run(command, shell=True, cwd=self.cwd)
         except Exception as e:
-            print(f"❌ Error running command: {e}")
+            raise RuntimeError(f"Command execution failed: {e}") from e
 
     def _handle_cd(self, command: str):
         try:
@@ -38,7 +37,7 @@ class ShellExecutor:
             self.cwd = new_dir
             print(f"📁 Changed directory to {self.cwd}")
         except Exception as e:
-            print(f"❌ Failed to change directory: {e}")
+            raise RuntimeError(f"Failed to change directory: {e}") from e
 
     def _is_unsupported(self, command: str) -> bool:
         # Add more as needed
