@@ -115,19 +115,26 @@ class Agent:
         """
         Send a message to the OpenAI API and stream the response to stdout.
         """
+        explanation = ""
+        self.messages.append({"role": "user", "content": self.explain_prompt})
+
         try:
             stream = self.client.chat.completions.create(
                 model=self.model,
-                messages=self.messages
-                + [
-                    {"role": "user", "content": self.explain_prompt},
-                ],
+                messages=self.messages,
                 stream=True,
             )
             for chunk in stream:
                 content = chunk.choices[0].delta.content
                 if content:
+                    explanation += content
                     yield content
+            self.messages.append(
+                ChatCompletionAssistantMessageParam(
+                    role="assistant",
+                    content=explanation,
+                )
+            )
         except Exception as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
