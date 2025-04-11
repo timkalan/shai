@@ -23,6 +23,7 @@ Guidelines:
 - Do NOT include sudo unless absolutely required.
 - Mark "dangerous" as true if the command deletes, modifies, or overwrites files, affects system state, or uses the network (e.g., `rm`, `mv`, `curl`, `pip install`, `ssh`, `chmod`, etc.).
 - Always fill in the "explanation" field clearly and concisely.
+- Avoid using shell features that are not widely supported (e.g., `$(...)`, `... && ...`, etc.).
 
 Examples of dangerous commands:
 - rm -rf some-folder

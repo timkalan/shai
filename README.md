@@ -10,3 +10,10 @@ python -m venv .venv
 source .venv/bin/activate
 pip3 install -e .
 ```
+
+Copy the `.env.example` file to `.env` and fill it out.
+
+
+# Usage
+
+Just call `shai "prompt"` and let the app guide you.

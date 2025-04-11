@@ -1,4 +1,3 @@
-import threading
 from pathlib import Path
 from typing import Generator, List
 
@@ -48,34 +47,6 @@ class Agent:
         Load a prompt from a file.
         """
         return Path(path).read_text().strip()
-
-    def ask(self, message: str) -> CommandsResponse:
-        """
-        Stream a natural-language explanation while generating shell commands.
-        """
-
-        # Start streaming explanation in a thread
-        def stream_task():
-            for chunk in self.explain(message):
-                print(chunk, end="", flush=True)
-
-        stream_thread = threading.Thread(target=stream_task)
-        stream_thread.start()
-
-        # Generate structured commands in main thread
-        try:
-            commands = self.generate_commands(message)
-        except Exception as e:
-            print(f"\nError: Failed to generate commands: {e}")
-            commands = CommandsResponse(commands=[])
-
-        # Wait for stream to finish
-        stream_thread.join()
-
-        print("\n\n--- Suggested Command(s) ---")
-        for cmd in commands.commands:
-            print(f"$ {cmd.cmd}\n# {cmd.explanation}")
-        return commands
 
     def explain(self, message: str) -> Generator[str, None, None]:
         """
