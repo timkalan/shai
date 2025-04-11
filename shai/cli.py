@@ -15,26 +15,37 @@ def main(prompt: str = typer.Argument(...)):
     """
     # Create context by calling any potentially relevant tools
     typer.echo("\n--- 🧠 Creating Context ---")
-    tool_calls = agent.create_context(prompt)
-    for tool_call in tool_calls:
-        typer.echo(
-            f"🔧 Tool: {tool_call.function.name}({tool_call.function.arguments})"
-        )
+    additional_prompt = None
+    while True:
+        try:
+            explanation, tool_calls = agent.create_context(prompt, additional_prompt)
+        except Exception as e:
+            typer.echo(f"\n❌ Error: {e}")
+            return
 
-    try:
-        agent.run_tools(tool_calls)
-    except Exception as e:
-        typer.echo(f"\n❌ Error: Failed to run tools: {e}")
-        return
+        if not tool_calls:
+            break
 
-    # Stream an explanation
-    typer.echo("\n--- 🗺️ Planning ---")
-    try:
-        for chunk in agent.explain():
-            typer.echo(chunk, nl=False)
-    except Exception as e:
-        typer.echo(f"\n❌ Error: Failed to explain: {e}")
-        return
+        typer.echo(f"💬 {explanation}")
+        for tool_call in tool_calls:
+            typer.echo(
+                f"🔧 Tool: {tool_call.function.name}({tool_call.function.arguments})"
+            )
+
+        # Run the tools
+        try:
+            agent.run_tools(tool_calls)
+        except Exception as e:
+            typer.echo(f"\n❌ Error: {e}")
+            return
+
+        if not additional_prompt:
+            additional_prompt = agent.explain_prompt
+
+        typer.echo()
+
+    # If no tool calls were made, we print the explanation
+    typer.echo(f"💬 {explanation}")
 
     # Generate commands
     try:
@@ -50,7 +61,7 @@ def main(prompt: str = typer.Argument(...)):
 
 
 def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
-    typer.echo("\n\n--- 🔧 Suggested Command(s) ---")
+    typer.echo("\n\n--- 🛠️ Suggested Command(s) ---")
     for cmd in commands.commands:
         danger_symbol = "⚠️ " if cmd.dangerous else ""
         typer.echo(f"# {danger_symbol}{cmd.explanation}\n$ {cmd.cmd}\n")

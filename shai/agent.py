@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Generator, List
+from typing import List, Tuple
 
 from openai import OpenAI
 from openai.types.chat import (
@@ -44,20 +44,34 @@ class Agent:
         """
         return Path(path).read_text().strip()
 
-    def create_context(self, message: str) -> List[ChatCompletionMessageToolCall]:
+    def create_context(
+        self, message: str, additional_prompt: str | None
+    ) -> Tuple[str, List[ChatCompletionMessageToolCall]]:
         """
         Create the context by calling any potetially relevant tools.
+        Also returns the thought process. Can take an additional prompt.
         """
+        if additional_prompt:
+            self.messages.append({"role": "user", "content": additional_prompt})
+
         self.messages.append({"role": "user", "content": message})
 
-        tool_calls = self.client.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=self.messages,
             tools=TOOL_DEFINITIONS,
             tool_choice="auto",
         )
 
-        to_call = tool_calls.choices[0].message.tool_calls or []
+        explanation = response.choices[0].message.content or ""
+        self.messages.append(
+            ChatCompletionAssistantMessageParam(
+                role="assistant",
+                content=explanation,
+            )
+        )
+
+        tool_calls = response.choices[0].message.tool_calls or []
 
         # TODO: ChatGPT told me to do this, but it seems hacky.
         # Convert to the correct param typ
@@ -70,18 +84,18 @@ class Agent:
                 },
                 "type": call.type,
             }
-            for call in to_call
+            for call in tool_calls
         ]
 
         self.messages.append(
             ChatCompletionAssistantMessageParam(
                 role="assistant",
-                content=tool_calls.choices[0].message.content,
+                content=response.choices[0].message.content,
                 tool_calls=tool_call_params,
             )
         )
 
-        return to_call
+        return explanation, tool_calls
 
     def run_tools(self, tool_calls: List[ChatCompletionMessageToolCall]):
         """
@@ -110,33 +124,6 @@ class Agent:
 
         if len(tool_calls) != len(tool_messages):
             raise RuntimeError("Mismatch between tool calls and tool responses!")
-
-    def explain(self) -> Generator[str, None, None]:
-        """
-        Send a message to the OpenAI API and stream the response to stdout.
-        """
-        explanation = ""
-        self.messages.append({"role": "user", "content": self.explain_prompt})
-
-        try:
-            stream = self.client.chat.completions.create(
-                model=self.model,
-                messages=self.messages,
-                stream=True,
-            )
-            for chunk in stream:
-                content = chunk.choices[0].delta.content
-                if content:
-                    explanation += content
-                    yield content
-            self.messages.append(
-                ChatCompletionAssistantMessageParam(
-                    role="assistant",
-                    content=explanation,
-                )
-            )
-        except Exception as e:
-            raise RuntimeError(f"LLM call failed: {e}") from e
 
     def generate_commands(self) -> CommandsResponse:
         """
