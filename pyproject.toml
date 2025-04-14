@@ -9,6 +9,7 @@ dependencies = [
     "openai",
     "pydantic",
     "python-dotenv",
+    "rich",
     "typer",
 ]
 
