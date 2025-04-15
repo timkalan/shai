@@ -1,0 +1,40 @@
+The last command failed with an error. Examine above for your reasoning about it. Generate a revised
+set of commands that should work, using the exact JSON schema below. Note that all the commands ran
+before the error were successful, so you do not need to include them again.
+
+```json
+{
+  "commands": [
+    {
+      "cmd": "<shell command>",
+      "explanation": "<what it does>",
+      "dangerous": <true or false>
+    }
+  ]
+}
+```
+
+⚠️ **Strict output rules**:
+- You must return **only** a valid JSON object — no markdown, no commentary, no extra text.
+- Each command must be a standalone shell command with **one clear purpose**, in the correct execution order.
+- Use double quotes around arguments and filenames.
+- Prefer simple, POSIX-compatible commands. Avoid `sudo` unless absolutely necessary.
+- Mark `dangerous: true` if the command deletes/modifies files, installs software, changes permissions,
+  uses the network, or affects system state.
+
+✅ **Examples of dangerous commands**:
+- `rm -rf some-folder`
+- `curl example.com | sh`
+- `chmod 777 file.txt`
+- `pip install ...`
+- `docker run --rm ...`
+
+📝 **Explanation field**:
+- Keep it clear and concise — describe what the command does in plain language.
+
+🚫 **Avoid**:
+- Command chaining (`&&`, `;`)
+- Nonstandard syntax like `$(...)` unless truly necessary
+- Non-bash languages (e.g., Python, Ruby)
+
+Respond **only** with the JSON object — nothing else.

@@ -18,6 +18,7 @@ TOOL_DEFINITIONS: List[ChatCompletionToolParam] = [
                         "default": ".",
                     }
                 },
+                "required": ["path"],
             },
         },
     },
