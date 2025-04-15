@@ -16,7 +16,7 @@ def main(prompt: str = typer.Argument(...)):
     """
     # Create context by calling any potentially relevant tools
     print("\n--- 🧠 [bold]Creating Context[/bold] ---")
-    additional_prompt = None
+    additional_prompt = agent.initial_prompt
     while True:
         try:
             explanation, tool_calls = agent.create_context(prompt, additional_prompt)
@@ -27,7 +27,8 @@ def main(prompt: str = typer.Argument(...)):
         if not tool_calls:
             break
 
-        print(f"💬 {explanation}")
+        # TODO: print the explanation only in verbose mode
+        # print(f"💬 {explanation}")
         for tool_call in tool_calls:
             print(
                 f"🔧 [bold]Tool:[/bold] {tool_call.function.name}({tool_call.function.arguments})"
@@ -43,10 +44,8 @@ def main(prompt: str = typer.Argument(...)):
         if not additional_prompt:
             additional_prompt = agent.explain_prompt
 
-        print()
-
     # If no tool calls were made, we print the explanation
-    print(f"💬 {explanation}")
+    print(f"\n💬 {explanation}")
 
     # Generate commands
     try:
@@ -68,7 +67,7 @@ def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
         print(f"# {danger_symbol}{cmd.explanation}\n")
         print(f"[bold]$ {cmd.cmd}[/bold]\n")
 
-    if typer.confirm("\n🤔 [bold]Run these command(s)?[/bold]"):
+    if typer.confirm("\n🤔 Run these command(s)?"):
         for cmd in commands.commands:
             try:
                 executor.run(cmd.cmd)

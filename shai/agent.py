@@ -32,11 +32,9 @@ class Agent:
         self.model: str = config.model
         self.command_prompt: str = self._load_prompt("shai/prompts/command_prompt.txt")
         self.explain_prompt: str = self._load_prompt("shai/prompts/explain_prompt.txt")
-        self.tool_prompt: str = self._load_prompt("shai/prompts/tool_prompt.txt")
+        self.initial_prompt: str = self._load_prompt("shai/prompts/initial_prompt.txt")
 
-        self.messages: list[ChatCompletionMessageParam] = [
-            {"role": "system", "content": self.tool_prompt},
-        ]
+        self.messages: list[ChatCompletionMessageParam] = []
 
     def _load_prompt(self, path: str) -> str:
         """
