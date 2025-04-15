@@ -50,8 +50,8 @@ def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
                 executor.run(cmd.cmd)
             except Exception as e:
                 error = f"\n❌ [bold red]Error executing command '{cmd.cmd}':[/bold red] {e}"
-                explanation = agent.create_context(error, agent.error_prompt, True)
                 print(error)
+                explanation = agent.create_context(error, agent.error_prompt, True)
                 print(f"\n💬 {explanation}")
 
                 try:
@@ -65,7 +65,8 @@ def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
                 if commands.commands:
                     execute_commands(commands, executor)
 
-        cleanup(executor)
+        # print("\n\n--- 🧹 [bold]Cleanup[/bold] ---")
+        # cleanup(executor)
 
 
 def cleanup(executor: ShellExecutor):
