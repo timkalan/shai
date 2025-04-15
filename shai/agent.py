@@ -33,6 +33,7 @@ class Agent:
         self.command_prompt: str = self._load_prompt("shai/prompts/command_prompt.txt")
         self.explain_prompt: str = self._load_prompt("shai/prompts/explain_prompt.txt")
         self.initial_prompt: str = self._load_prompt("shai/prompts/initial_prompt.txt")
+        self.error_prompt: str = self._load_prompt("shai/prompts/error_prompt.txt")
 
         self.messages: list[ChatCompletionMessageParam] = []
 

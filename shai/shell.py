@@ -22,9 +22,12 @@ class ShellExecutor:
             raise ValueError(f"Unsupported command: {command}")
 
         try:
-            subprocess.run(command, shell=True, cwd=self.cwd)
+            result = subprocess.run(command, shell=True, cwd=self.cwd)
         except Exception as e:
             raise RuntimeError(f"Command execution failed: {e}") from e
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Command failed with return code {result.returncode}")
 
     def _handle_cd(self, command: str):
         try:

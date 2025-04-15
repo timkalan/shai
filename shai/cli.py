@@ -41,7 +41,7 @@ def main(prompt: str = typer.Argument(...)):
             print(f"\n❌ [bold red]Error:[/bold red] {e}")
             return
 
-        if not additional_prompt:
+        if additional_prompt == agent.initial_prompt:
             additional_prompt = agent.explain_prompt
 
     # If no tool calls were made, we print the explanation
@@ -61,6 +61,9 @@ def main(prompt: str = typer.Argument(...)):
 
 
 def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
+    """
+    Execute the generated commands.
+    """
     print("\n\n--- 🛠️ [bold]Suggested Command(s)[/bold] ---")
     for cmd in commands.commands:
         danger_symbol = "⚠️ " if cmd.dangerous else ""
@@ -72,7 +75,37 @@ def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
             try:
                 executor.run(cmd.cmd)
             except Exception as e:
-                print(f"[bold red]Error executing command '{cmd.cmd}':[/bold red] {e}")
+                error = (
+                    f"❌ [bold red]Error executing command '{cmd.cmd}':[/bold red] {e}"
+                )
+                explanation, tool_calls = agent.create_context(
+                    error, agent.explain_prompt
+                )
+                print(error)
+                print(f"\n💬 {explanation}")
+                for tool_call in tool_calls:
+                    print(
+                        f"🔧 [bold]Tool:[/bold] {tool_call.function.name}({tool_call.function.arguments})"
+                    )
+
+                try:
+                    agent.run_tools(tool_calls)
+                except Exception as e:
+                    print(f"\n❌ [bold red]Error:[/bold red] {e}")
+                    return
+
+                try:
+                    commands = agent.generate_commands()
+                except Exception as e:
+                    print(
+                        f"\n❌ [bold red]Error:[/bold red] Failed to generate commands: {e}"
+                    )
+                    commands = CommandsResponse(commands=[])
+
+                if commands.commands:
+                    execute_commands(commands, executor)
+    else:
+        print("\n❌ [bold red]Error:[/bold red] No valid commands returned.")
 
 
 if __name__ == "__main__":
