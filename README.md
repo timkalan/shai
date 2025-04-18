@@ -3,6 +3,8 @@
 Want to get something done in the shell but can't quite remember how? Too shy to ask your coworkers?
 Too deep in the AI sauce to Google it? `shai` has your back.
 
+![Shai Logo](shai.png)
+
 # Setup
 
 ```bash
@@ -11,8 +13,8 @@ source .venv/bin/activate
 pip3 install -e .
 ```
 
-Copy the `.env.example` file to `.env` and fill it out.
-
+Copy the `.env.example` file to `.env` and fill it out, I am using `gemini-2.0-flash` with a free API key
+from Google.
 
 # Usage
 
