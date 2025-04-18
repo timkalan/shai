@@ -35,6 +35,5 @@ any additional cleanup commands are needed, just return an empty JSON object `{}
 🚫 **Avoid**:
 - Command chaining (`&&`, `;`)
 - Nonstandard syntax like `$(...)` unless truly necessary
-- Non-bash languages (e.g., Python, Ruby)
 
 Respond **only** with the JSON object — nothing else.

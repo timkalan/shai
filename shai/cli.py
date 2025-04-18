@@ -10,7 +10,8 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
 
-from shai.agent import Agent, CommandsResponse
+from shai.agent import Agent
+from shai.types import CommandsResponse, Command
 from shai.shell import ShellExecutor
 
 app = typer.Typer()
@@ -28,17 +29,37 @@ def make_layout() -> Layout:
 
 def tools_panel(tools: list[str]) -> Panel:
     content = "\n".join(tools)
-    return Panel(Text.from_markup(content), title="🛠 Tools")
+    return Panel(
+        Text.from_markup(content),
+        title="🛠 Tools",
+    )
 
 
 def thoughts_panel(lines: list[str]) -> Panel:
     content = "\n".join(lines)
-    return Panel(Text.from_markup(content), title="💭 Thoughts")
+    return Panel(
+        Text.from_markup(content),
+        title="💭 Thoughts",
+    )
 
 
-def tasks_panel(commands: list[str]) -> Panel:
-    content = "\n".join(commands)
-    return Panel(Text.from_markup(content), title="📜 Tasks")
+def tasks_panel(commands: list[Command]) -> Panel:
+    # danger_symbol = "⚠️ " if cmd.dangerous else ""
+    # tasks_state.append(f"# {danger_symbol}{cmd.explanation}\n$ {cmd.cmd}\n")
+
+    content = "\n\n".join(
+        (
+            f"[yellow]# {cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd}[/bold green]"
+            if hasattr(cmd, "explanation")
+            else f"[bold green]$ {cmd}[/bold green]"
+        )
+        for cmd in commands
+    )
+    return Panel(
+        Text.from_markup(content, justify="left", overflow="fold"),
+        title="📜 Tasks",
+        # border_style="green",
+    )
 
 
 @app.command()
@@ -53,7 +74,8 @@ def main(prompt: str = typer.Argument(...)):
     max_width = int(term_width * 0.66)
 
     wrapped_layout = Align.center(
-        Panel(layout, title="🤖 shai", width=max_width, height=40), vertical="top"
+        Panel(layout, title="🤖 shai", width=max_width, height=40, border_style="dim"),
+        vertical="top",
     )
 
     with Live(wrapped_layout, refresh_per_second=5):
@@ -77,11 +99,7 @@ def main(prompt: str = typer.Argument(...)):
             commands = CommandsResponse(commands=[])
 
         if commands.commands:
-            tasks_state = []
-            for cmd in commands.commands:
-                danger_symbol = "⚠️ " if cmd.dangerous else ""
-                tasks_state.append(f"# {danger_symbol}{cmd.explanation}\n$ {cmd.cmd}\n")
-                layout["tasks"].update(tasks_panel(tasks_state))
+            layout["tasks"].update(tasks_panel(commands.commands))
 
         else:
             print("\n❌ [bold red]Error:[/bold red] No valid commands returned.")

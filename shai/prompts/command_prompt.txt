@@ -34,6 +34,5 @@ The time to translate the user’s intent into accurate, safe shell commands usi
 🚫 **Avoid**:
 - Command chaining (`&&`, `;`)
 - Nonstandard syntax like `$(...)` unless truly necessary
-- Non-bash languages (e.g., Python, Ruby)
 
 Respond **only** with the JSON object — nothing else.
