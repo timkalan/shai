@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import Generator, List, Tuple
 
 from openai import OpenAI
 from openai.types.chat import (
@@ -10,7 +10,6 @@ from openai.types.chat import (
     ChatCompletionMessageToolCall,
     ChatCompletionMessageToolCallParam,
 )
-from rich import print
 
 from shai.config import Config
 from shai.tools import TOOL_DEFINITIONS, run_tool
@@ -99,9 +98,10 @@ class Agent:
 
     def create_context(
         self, message: str, additional_prompt: str | None, begin_with_prompt: bool
-    ) -> str:
+    ) -> Generator[str, None, str]:
         """
         Run get_context until no more tools are called.
+        Yields tool information and returns the explanation.
         """
         self.messages.append({"role": "user", "content": message})
 
@@ -118,21 +118,21 @@ class Agent:
 
             # Run the tools
             try:
-                self.run_tools(tool_calls)
+                for tool_info in self.run_tools(tool_calls):
+                    yield tool_info
             except Exception as e:
                 raise RuntimeError(f"Failed to run tools: {e}") from e
 
         return explanation
 
-    def run_tools(self, tool_calls: List[ChatCompletionMessageToolCall]):
+    def run_tools(
+        self, tool_calls: List[ChatCompletionMessageToolCall]
+    ) -> Generator[str, None, None]:
         """
-        Run the tools and return the results.
+        Run the tools and yield the results.
         """
-        tool_messages: List[ChatCompletionFunctionMessageParam] = []
         for call in tool_calls:
             try:
-                print(f"🔧 Tool: {call.function.name}({call.function.arguments})")
-
                 args = json.loads(call.function.arguments)
                 tool_output = run_tool(call.function.name, args)
             except Exception as e:
@@ -147,12 +147,9 @@ class Agent:
                 "name": call.function.name,
             }
 
-            tool_messages.append(tool_message)
+            self.messages.append(tool_message)
 
-        self.messages.extend(tool_messages)
-
-        if len(tool_calls) != len(tool_messages):
-            raise RuntimeError("Mismatch between tool calls and tool responses!")
+            yield f"🔧 Tool: {call.function.name}({call.function.arguments})"
 
     def generate_commands(self, prompt: str) -> CommandsResponse:
         """
