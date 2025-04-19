@@ -3,7 +3,6 @@ from shutil import get_terminal_size
 from typing import Generator
 
 import typer
-from rich import print
 from rich.align import Align
 from rich.console import Console
 from rich.layout import Layout
@@ -12,8 +11,8 @@ from rich.panel import Panel
 from rich.text import Text
 
 from shai.agent import Agent
-from shai.types import CommandsResponse, Command
 from shai.shell import ShellExecutor
+from shai.types import Command, CommandsResponse
 
 app = typer.Typer()
 agent = Agent()
@@ -71,15 +70,15 @@ def thoughts_panel(lines: list[str]) -> Panel:
 
 def tasks_panel(commands: list[DisplayCommand]) -> Panel:
     statuses = {
-        "pending": "[bold yellow]Pending...[/bold yellow]",
-        "running": "[bold blue]Running...[/bold blue]",
-        "success": "[bold green]Success![/bold green]",
-        "error": "[bold red]Error![/bold red]",
+        "pending": "⏳",
+        "running": "🏃",
+        "success": "✅",
+        "error": "❌",
     }
 
     content = "\n\n".join(
         (
-            f"\n# {statuses[cmd.status]}\n[yellow]# {cmd.cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd.cmd}[/bold green]"
+            f"# {statuses[cmd.status]}{'⚠️' if cmd.cmd.dangerous else ''}[yellow] {cmd.cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd.cmd}[/bold green]"
             if hasattr(cmd.cmd, "explanation")
             else f"[bold green]$ {cmd}[/bold green]"
         )
@@ -144,7 +143,16 @@ def main(prompt: str = typer.Argument(...)):
             )
 
         else:
-            print("\n❌ [bold red]Error:[/bold red] No valid commands returned.")
+            layout["tasks"].update(
+                tasks_panel(
+                    [
+                        DisplayCommand(
+                            cmd=Command(cmd="No commands generated", explanation=""),
+                            status="error",
+                        )
+                    ]
+                )
+            )
 
         execute_commands(commands, executor, layout)
 
@@ -155,54 +163,61 @@ def execute_commands(
     """
     Execute the generated commands.
     """
-    if typer.confirm("\n🤔 Run these command(s)?"):
-        for cmd in commands.commands:
+    for cmd in commands.commands:
+        try:
+            layout["tasks"].update(
+                tasks_panel(
+                    [
+                        DisplayCommand(cmd=cmd, status="running"),
+                    ]
+                )
+            )
+            executor.run(cmd.cmd)
+            layout["tasks"].update(
+                tasks_panel(
+                    [
+                        DisplayCommand(cmd=cmd, status="success"),
+                    ]
+                )
+            )
+        except Exception as e:
+            layout["tasks"].update(
+                tasks_panel(
+                    [
+                        DisplayCommand(cmd=cmd, status="error"),
+                    ]
+                )
+            )
+            error = (
+                f"\n❌ [bold red]Error executing command '{cmd.cmd}':[/bold red] {e}"
+            )
+            explanation = _tools_and_explanation(
+                agent.create_context(error, agent.error_prompt, True), layout
+            )
+
+            layout["thoughts"].update(
+                thoughts_panel(
+                    [
+                        f"❌ [bold red]Error:[/bold red] {error}",
+                        f"💬 [bold green]Explanation:[/bold green] {explanation}",
+                    ]
+                )
+            )
+
             try:
-                layout["tasks"].update(
-                    tasks_panel(
-                        [
-                            DisplayCommand(cmd=cmd, status="running"),
-                        ]
-                    )
-                )
-                executor.run(cmd.cmd)
-                layout["tasks"].update(
-                    tasks_panel(
-                        [
-                            DisplayCommand(cmd=cmd, status="success"),
-                        ]
-                    )
-                )
+                commands = agent.generate_commands(agent.error_command_prompt)
             except Exception as e:
-                layout["tasks"].update(
-                    tasks_panel(
+                layout["thoughts"].update(
+                    thoughts_panel(
                         [
-                            DisplayCommand(cmd=cmd, status="error"),
+                            f"❌ [bold red]Error, failed to generate commands:[/bold red] {e}"
                         ]
                     )
                 )
-                error = f"\n❌ [bold red]Error executing command '{cmd.cmd}':[/bold red] {e}"
-                print(error)
-                gen = agent.create_context(error, agent.error_prompt, True)
-                while True:
-                    try:
-                        tool_call = next(gen)
-                        print(tool_call)
-                    except StopIteration as e:
-                        explanation = e.value
-                        break
-                print(f"\n💬 {explanation}")
+                commands = CommandsResponse(commands=[])
 
-                try:
-                    commands = agent.generate_commands(agent.error_command_prompt)
-                except Exception as e:
-                    print(
-                        f"\n❌ [bold red]Error:[/bold red] Failed to generate commands: {e}"
-                    )
-                    commands = CommandsResponse(commands=[])
-
-                if commands.commands:
-                    execute_commands(commands, executor, layout)
+            if commands.commands:
+                execute_commands(commands, executor, layout)
 
         # print("\n\n--- 🧹 [bold]Cleanup[/bold] ---")
         # cleanup(executor)
