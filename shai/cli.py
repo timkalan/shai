@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from shutil import get_terminal_size
 from typing import Generator
 
@@ -20,9 +21,25 @@ executor = ShellExecutor()
 console = Console()
 
 
+@dataclass()
+class DisplayCommand:
+    cmd: Command
+    status: str  # pending, running, success, error
+
+
 def make_layout() -> Layout:
     layout = Layout()
-    layout.split(Layout(name="upper", ratio=1), Layout(name="tasks", ratio=1))
+    layout.split_row(
+        Layout(name="triggers", ratio=1),
+        Layout(name="main", ratio=4),
+    )
+
+    layout["main"].split(
+        Layout(name="upper", ratio=1),
+        Layout(name="tasks", ratio=1),
+    )
+    # layout.split(Layout(name="upper", ratio=1), Layout(name="tasks", ratio=1))
+
     layout["upper"].split_row(Layout(name="tools"), Layout(name="thoughts"))
     return layout
 
@@ -35,6 +52,15 @@ def tools_panel(tools: list[str]) -> Panel:
     )
 
 
+def triggers_panel(triggers: list[str]) -> Panel:
+    content = "\n".join(triggers)
+    # content = Text.from_markup(
+    #     "[bold cyan][r][/bold cyan] Run all\n[bold red][a][/bold red] Abort",
+    #     justify="left",
+    # )
+    return Panel(Text.from_markup(content), title="🎛️ Triggers")
+
+
 def thoughts_panel(lines: list[str]) -> Panel:
     content = "\n".join(lines)
     return Panel(
@@ -43,14 +69,18 @@ def thoughts_panel(lines: list[str]) -> Panel:
     )
 
 
-def tasks_panel(commands: list[Command]) -> Panel:
-    # danger_symbol = "⚠️ " if cmd.dangerous else ""
-    # tasks_state.append(f"# {danger_symbol}{cmd.explanation}\n$ {cmd.cmd}\n")
+def tasks_panel(commands: list[DisplayCommand]) -> Panel:
+    statuses = {
+        "pending": "[bold yellow]Pending...[/bold yellow]",
+        "running": "[bold blue]Running...[/bold blue]",
+        "success": "[bold green]Success![/bold green]",
+        "error": "[bold red]Error![/bold red]",
+    }
 
     content = "\n\n".join(
         (
-            f"[yellow]# {cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd}[/bold green]"
-            if hasattr(cmd, "explanation")
+            f"\n# {statuses[cmd.status]}\n[yellow]# {cmd.cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd.cmd}[/bold green]"
+            if hasattr(cmd.cmd, "explanation")
             else f"[bold green]$ {cmd}[/bold green]"
         )
         for cmd in commands
@@ -69,9 +99,13 @@ def main(prompt: str = typer.Argument(...)):
     """
     layout = make_layout()
 
-    # Set a target width (e.g., 2/3 of terminal)
+    # Set a target width
     term_width = get_terminal_size((80, 20)).columns
-    max_width = int(term_width * 0.66)
+    max_width = int(term_width * 0.8)
+
+    layout["tasks"].update(tasks_panel([]))
+    layout["thoughts"].update(thoughts_panel([]))
+    # layout["triggers"].update(triggers_panel([]))
 
     wrapped_layout = Align.center(
         Panel(layout, title="🤖 shai", width=max_width, height=40, border_style="dim"),
@@ -79,6 +113,7 @@ def main(prompt: str = typer.Argument(...)):
     )
 
     with Live(wrapped_layout, refresh_per_second=5):
+
         # Context phase
         explanation = _tools_and_explanation(
             agent.create_context(prompt, agent.explain_prompt, False), layout
@@ -99,24 +134,53 @@ def main(prompt: str = typer.Argument(...)):
             commands = CommandsResponse(commands=[])
 
         if commands.commands:
-            layout["tasks"].update(tasks_panel(commands.commands))
+            layout["tasks"].update(
+                tasks_panel(
+                    [
+                        DisplayCommand(cmd=cmd, status="pending")
+                        for cmd in commands.commands
+                    ]
+                )
+            )
 
         else:
             print("\n❌ [bold red]Error:[/bold red] No valid commands returned.")
 
-    execute_commands(commands, executor)
+        execute_commands(commands, executor, layout)
 
 
-def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
+def execute_commands(
+    commands: CommandsResponse, executor: ShellExecutor, layout: Layout
+):
     """
     Execute the generated commands.
     """
     if typer.confirm("\n🤔 Run these command(s)?"):
         for cmd in commands.commands:
             try:
-                print(f"\n--- 🏃 Running command: {cmd.cmd} ---")
+                layout["tasks"].update(
+                    tasks_panel(
+                        [
+                            DisplayCommand(cmd=cmd, status="running"),
+                        ]
+                    )
+                )
                 executor.run(cmd.cmd)
+                layout["tasks"].update(
+                    tasks_panel(
+                        [
+                            DisplayCommand(cmd=cmd, status="success"),
+                        ]
+                    )
+                )
             except Exception as e:
+                layout["tasks"].update(
+                    tasks_panel(
+                        [
+                            DisplayCommand(cmd=cmd, status="error"),
+                        ]
+                    )
+                )
                 error = f"\n❌ [bold red]Error executing command '{cmd.cmd}':[/bold red] {e}"
                 print(error)
                 gen = agent.create_context(error, agent.error_prompt, True)
@@ -138,7 +202,7 @@ def execute_commands(commands: CommandsResponse, executor: ShellExecutor):
                     commands = CommandsResponse(commands=[])
 
                 if commands.commands:
-                    execute_commands(commands, executor)
+                    execute_commands(commands, executor, layout)
 
         # print("\n\n--- 🧹 [bold]Cleanup[/bold] ---")
         # cleanup(executor)
@@ -149,11 +213,7 @@ def _tools_and_explanation(generator: Generator[str, None, str], layout: Layout)
     Prints live-updating tools and thoughts while building context.
     """
     tools_state = []
-    thoughts_state = []
-
     layout["tools"].update(tools_panel(tools_state))
-    layout["thoughts"].update(thoughts_panel(thoughts_state))
-    layout["tasks"].update(tasks_panel([]))
 
     while True:
         try:
@@ -167,21 +227,21 @@ def _tools_and_explanation(generator: Generator[str, None, str], layout: Layout)
     return explanation
 
 
-def cleanup(executor: ShellExecutor):
-    """
-    After the generated commands are ran successfully, check that the output is what was expected.
-    """
-    explanation = agent.create_context(agent.cleanup_prompt, None, True)
-    print(f"\n💬 {explanation}")
-
-    try:
-        commands = agent.generate_commands(agent.cleanup_command_prompt)
-    except Exception as e:
-        print(f"\n❌ [bold red]Error:[/bold red] Failed to generate commands: {e}")
-        commands = CommandsResponse(commands=[])
-
-    if commands.commands:
-        execute_commands(commands, executor)
+# def cleanup(executor: ShellExecutor):
+#     """
+#     After the generated commands are ran successfully, check that the output is what was expected.
+#     """
+#     explanation = agent.create_context(agent.cleanup_prompt, None, True)
+#     print(f"\n💬 {explanation}")
+#
+#     try:
+#         commands = agent.generate_commands(agent.cleanup_command_prompt)
+#     except Exception as e:
+#         print(f"\n❌ [bold red]Error:[/bold red] Failed to generate commands: {e}")
+#         commands = CommandsResponse(commands=[])
+#
+#     if commands.commands:
+#         execute_commands(commands, executor)
 
 
 if __name__ == "__main__":
