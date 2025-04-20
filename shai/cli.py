@@ -44,13 +44,12 @@ def tools_panel(tools: list[str]) -> Panel:
     )
 
 
-def triggers_panel(triggers: list[str]) -> Panel:
-    content = "\n".join(triggers)
-    # content = Text.from_markup(
-    #     "[bold cyan][r][/bold cyan] Run all\n[bold red][a][/bold red] Abort",
-    #     justify="left",
-    # )
-    return Panel(Text.from_markup(content), title="🎛️ Triggers")
+def triggers_panel() -> Panel:
+    content = Text.from_markup(
+        "[bold cyan]r[/bold cyan] Run all\n[bold red]a[/bold red] Abort",
+        justify="left",
+    )
+    return Panel(content, title="👤 Triggers")
 
 
 def thoughts_panel(lines: list[str]) -> Panel:
@@ -95,18 +94,17 @@ def main(prompt: str = typer.Argument(...)):
     term_width = get_terminal_size((80, 20)).columns
     max_width = int(term_width * 0.8)
 
-    layout["tasks"].update(tasks_panel([]))
-    layout["thoughts"].update(thoughts_panel([]))
-    layout["tools"].update(tools_panel([]))
-    # layout["triggers"].update(triggers_panel([]))
-
     wrapped_layout = Align.center(
         Panel(layout, title="🤖 shai", width=max_width, height=40, border_style="dim"),
         vertical="top",
     )
 
-    with Live(wrapped_layout, refresh_per_second=5):
+    layout["tasks"].update(tasks_panel([]))
+    layout["thoughts"].update(thoughts_panel([]))
+    layout["tools"].update(tools_panel([]))
+    layout["triggers"].update(triggers_panel())
 
+    with Live(wrapped_layout, refresh_per_second=30):
         # Context phase
         explanation = _tools_and_explanation(
             agent.create_context(prompt, agent.explain_prompt, False), layout
