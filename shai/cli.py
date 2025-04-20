@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from shutil import get_terminal_size
 from typing import Generator
 
@@ -12,18 +11,12 @@ from rich.text import Text
 
 from shai.agent import Agent
 from shai.shell import ShellExecutor
-from shai.types import Command, CommandsResponse
+from shai.types import Command, CommandsResponse, DisplayCommand
 
 app = typer.Typer()
 agent = Agent()
 executor = ShellExecutor()
 console = Console()
-
-
-@dataclass()
-class DisplayCommand:
-    cmd: Command
-    status: str  # pending, running, success, error
 
 
 def make_layout() -> Layout:
@@ -104,6 +97,7 @@ def main(prompt: str = typer.Argument(...)):
 
     layout["tasks"].update(tasks_panel([]))
     layout["thoughts"].update(thoughts_panel([]))
+    layout["tools"].update(tools_panel([]))
     # layout["triggers"].update(triggers_panel([]))
 
     wrapped_layout = Align.center(
@@ -133,16 +127,17 @@ def main(prompt: str = typer.Argument(...)):
             commands = CommandsResponse(commands=[])
 
         if commands.commands:
+            display_commands = [
+                DisplayCommand(cmd=cmd, status="pending") for cmd in commands.commands
+            ]
             layout["tasks"].update(
                 tasks_panel(
-                    [
-                        DisplayCommand(cmd=cmd, status="pending")
-                        for cmd in commands.commands
-                    ]
+                    display_commands,
                 )
             )
 
         else:
+            display_commands = []
             layout["tasks"].update(
                 tasks_panel(
                     [
@@ -154,43 +149,28 @@ def main(prompt: str = typer.Argument(...)):
                 )
             )
 
-        execute_commands(commands, executor, layout)
+        execute_commands(display_commands, executor, layout)
 
 
 def execute_commands(
-    commands: CommandsResponse, executor: ShellExecutor, layout: Layout
+    commands: list[DisplayCommand], executor: ShellExecutor, layout: Layout
 ):
     """
     Execute the generated commands.
     """
-    for cmd in commands.commands:
+    for i in range(len(commands)):
         try:
-            layout["tasks"].update(
-                tasks_panel(
-                    [
-                        DisplayCommand(cmd=cmd, status="running"),
-                    ]
-                )
-            )
-            executor.run(cmd.cmd)
-            layout["tasks"].update(
-                tasks_panel(
-                    [
-                        DisplayCommand(cmd=cmd, status="success"),
-                    ]
-                )
-            )
+            commands[i].status = "running"
+            layout["tasks"].update(tasks_panel(commands))
+
+            executor.run(commands[i].cmd.cmd)
+
+            commands[i].status = "success"
+            layout["tasks"].update(tasks_panel(commands))
         except Exception as e:
-            layout["tasks"].update(
-                tasks_panel(
-                    [
-                        DisplayCommand(cmd=cmd, status="error"),
-                    ]
-                )
-            )
-            error = (
-                f"\n❌ [bold red]Error executing command '{cmd.cmd}':[/bold red] {e}"
-            )
+            commands[i].status = "error"
+            layout["tasks"].update(tasks_panel(commands))
+            error = f"\n❌ [bold red]Error executing command '{commands[i].cmd.cmd}':[/bold red] {e}"
             explanation = _tools_and_explanation(
                 agent.create_context(error, agent.error_prompt, True), layout
             )
@@ -205,7 +185,11 @@ def execute_commands(
             )
 
             try:
-                commands = agent.generate_commands(agent.error_command_prompt)
+                generated_commands = agent.generate_commands(agent.error_command_prompt)
+                commands = [
+                    DisplayCommand(cmd=cmd, status="pending")
+                    for cmd in generated_commands.commands
+                ]
             except Exception as e:
                 layout["thoughts"].update(
                     thoughts_panel(
@@ -214,9 +198,9 @@ def execute_commands(
                         ]
                     )
                 )
-                commands = CommandsResponse(commands=[])
+                commands = []
 
-            if commands.commands:
+            if commands:
                 execute_commands(commands, executor, layout)
 
         # print("\n\n--- 🧹 [bold]Cleanup[/bold] ---")

@@ -18,3 +18,12 @@ class CommandsResponse(BaseModel):
     """
 
     commands: List[Command]
+
+
+class DisplayCommand(BaseModel):
+    """
+    A class to represent a command with its status for display purposes.
+    """
+
+    cmd: Command
+    status: str  # pending, running, success, error

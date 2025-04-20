@@ -36,13 +36,9 @@ class ShellExecutor:
     def _handle_cd(self, command: str):
         try:
             parts = shlex.split(command)
-            if len(parts) < 2:
-                print("❌ No directory specified.")
-                return
             new_dir = os.path.abspath(os.path.join(self.cwd, parts[1]))
             os.chdir(new_dir)
             self.cwd = new_dir
-            print(f"📁 Changed directory to {self.cwd}")
         except Exception as e:
             raise RuntimeError(f"Failed to change directory: {e}") from e
 
