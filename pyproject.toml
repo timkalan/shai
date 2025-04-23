@@ -8,6 +8,7 @@ authors = [
 dependencies = [
     "openai",
     "pydantic",
+    "pynput",
     "python-dotenv",
     "rich",
     "typer",

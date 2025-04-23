@@ -1,7 +1,10 @@
+import threading
+import time
 from shutil import get_terminal_size
 from typing import Generator
 
 import typer
+from pynput import keyboard
 from rich.align import Align
 from rich.console import Console
 from rich.layout import Layout
@@ -18,6 +21,32 @@ agent = Agent()
 executor = ShellExecutor()
 console = Console()
 
+# --- Globals for input handling ---
+trigger_key = None
+trigger_lock = threading.Lock()
+abort_requested = threading.Event()
+
+
+def on_press(key):
+    """
+    Callback function for key press events.
+    Sets the trigger_key based on user input.
+    """
+    global trigger_key
+    try:
+        char = key.char
+        with trigger_lock:
+            if char in ["r", "a"]:
+                trigger_key = char
+                if char == "a":
+                    abort_requested.set()
+    except AttributeError:
+        # Special keys (like shift, ctrl, etc.) don't have .char
+        pass
+
+
+keyboard_listener = keyboard.Listener(on_press=on_press)
+
 
 def make_layout() -> Layout:
     layout = Layout()
@@ -30,8 +59,6 @@ def make_layout() -> Layout:
         Layout(name="upper", ratio=1),
         Layout(name="tasks", ratio=1),
     )
-    # layout.split(Layout(name="upper", ratio=1), Layout(name="tasks", ratio=1))
-
     layout["upper"].split_row(Layout(name="tools"), Layout(name="thoughts"))
     return layout
 
@@ -44,9 +71,11 @@ def tools_panel(tools: list[str]) -> Panel:
     )
 
 
-def triggers_panel() -> Panel:
+def triggers_panel(status: str = "Waiting...") -> Panel:
     content = Text.from_markup(
-        "[bold cyan]r[/bold cyan] Run all\n[bold red]a[/bold red] Abort",
+        "[bold cyan]r[/bold cyan] Run all\n"
+        "[bold red]a[/bold red] Abort\n\n"
+        f"[dim]Status: {status}[/dim]",
         justify="left",
     )
     return Panel(content, title="👤 Triggers")
@@ -66,11 +95,12 @@ def tasks_panel(commands: list[DisplayCommand]) -> Panel:
         "running": "🏃",
         "success": "✅",
         "error": "❌",
+        "aborted": "🛑",
     }
 
     content = "\n\n".join(
         (
-            f"# {statuses[cmd.status]}{'⚠️' if cmd.cmd.dangerous else ''}[yellow] {cmd.cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd.cmd}[/bold green]"
+            f"# {statuses.get(cmd.status, '?')}{'⚠️' if cmd.cmd.dangerous else ''}[yellow] {cmd.cmd.explanation}[/yellow]\n[bold green]$ {cmd.cmd.cmd}[/bold green]"
             if hasattr(cmd.cmd, "explanation")
             else f"[bold green]$ {cmd}[/bold green]"
         )
@@ -79,18 +109,13 @@ def tasks_panel(commands: list[DisplayCommand]) -> Panel:
     return Panel(
         Text.from_markup(content, justify="left", overflow="fold"),
         title="📜 Tasks",
-        # border_style="green",
     )
 
 
 @app.command()
 def main(prompt: str = typer.Argument(...)):
-    """
-    Ask shai to generate shell commands from natural language.
-    """
     layout = make_layout()
 
-    # Set a target width
     term_width = get_terminal_size((80, 20)).columns
     max_width = int(term_width * 0.8)
 
@@ -99,147 +124,269 @@ def main(prompt: str = typer.Argument(...)):
         vertical="top",
     )
 
+    # Initial layout setup
     layout["tasks"].update(tasks_panel([]))
-    layout["thoughts"].update(thoughts_panel([]))
-    layout["tools"].update(tools_panel([]))
-    layout["triggers"].update(triggers_panel())
+    layout["thoughts"].update(thoughts_panel(["[dim]Generating explanation...[/dim]"]))
+    layout["tools"].update(tools_panel(["[dim]Initializing...[/dim]"]))
+    layout["triggers"].update(triggers_panel("Initializing..."))
 
-    with Live(wrapped_layout, refresh_per_second=30):
-        # Context phase
-        explanation = _tools_and_explanation(
-            agent.create_context(prompt, agent.explain_prompt, False), layout
-        )
+    keyboard_listener.start()
 
-        # Show explanation in thoughts
-        layout["thoughts"].update(
-            thoughts_panel(["✅ [bold green]Explanation:[/bold green]", explanation])
-        )
+    try:
+        with Live(
+            wrapped_layout, auto_refresh=False, vertical_overflow="visible"
+        ) as live:
+            layout["triggers"].update(triggers_panel("Generating context..."))
+            live.refresh()
 
-        # Generate commands
-        try:
-            commands = agent.generate_commands(agent.command_prompt)
-        except Exception as e:
-            layout["thoughts"].update(
-                thoughts_panel([f"❌ [bold red]Error:[/bold red] {e}"])
+            # Context phase
+            explanation = _tools_and_explanation(
+                agent.create_context(prompt, agent.explain_prompt, False), layout, live
             )
-            commands = CommandsResponse(commands=[])
 
-        if commands.commands:
-            display_commands = [
-                DisplayCommand(cmd=cmd, status="pending") for cmd in commands.commands
-            ]
-            layout["tasks"].update(
-                tasks_panel(
-                    display_commands,
+            if abort_requested.is_set():
+                layout["thoughts"].update(
+                    thoughts_panel(["[bold red]Aborted by user.[/bold red]"])
+                )
+                layout["triggers"].update(triggers_panel("Aborted."))
+                return
+
+            layout["thoughts"].update(
+                thoughts_panel(
+                    ["✅ [bold green]Explanation:[/bold green]", explanation]
                 )
             )
-
-        else:
-            display_commands = []
+            layout["triggers"].update(triggers_panel("Generating commands..."))
             layout["tasks"].update(
-                tasks_panel(
+                tools_panel(
                     [
-                        DisplayCommand(
-                            cmd=Command(cmd="No commands generated", explanation=""),
-                            status="error",
-                        )
+                        "[dim]Generating commands...[/dim]",
                     ]
                 )
             )
+            live.refresh()
 
-        execute_commands(display_commands, executor, layout)
+            # Generate commands
+            try:
+                commands = agent.generate_commands(agent.command_prompt)
+            except Exception as e:
+                layout["thoughts"].update(
+                    thoughts_panel([f"[bold red]Error:[/bold red] {e}"])
+                )
+                layout["triggers"].update(triggers_panel("Error."))
+                commands = CommandsResponse(commands=[])
+
+            if abort_requested.is_set():
+                layout["thoughts"].update(
+                    thoughts_panel(["[bold red]Aborted by user.[/bold red]"])
+                )
+                layout["triggers"].update(triggers_panel("Aborted."))
+                return
+
+            if commands.commands:
+                display_commands = [
+                    DisplayCommand(cmd=cmd, status="pending")
+                    for cmd in commands.commands
+                ]
+                layout["tasks"].update(tasks_panel(display_commands))
+                layout["triggers"].update(
+                    triggers_panel("Waiting for user input (r/a)...")
+                )
+                live.refresh()
+
+                # Wait for user input
+                wait_for_user(layout, live, display_commands)
+
+            # If no commands were generated
+            else:
+                display_commands = []
+                layout["tasks"].update(
+                    tasks_panel(
+                        [
+                            DisplayCommand(
+                                cmd=Command(
+                                    cmd="No commands generated", explanation=""
+                                ),
+                                status="error",
+                            )
+                        ]
+                    )
+                )
+                layout["triggers"].update(triggers_panel("No commands."))
+
+            # Keep final state visible briefly or wait for another key
+            layout["triggers"].update(triggers_panel("Finished."))
+            live.refresh()
+            time.sleep(2)  # Keep final display for 2 seconds
+
+    finally:
+        keyboard_listener.stop()
 
 
 def execute_commands(
-    commands: list[DisplayCommand], executor: ShellExecutor, layout: Layout
+    commands: list[DisplayCommand],
+    executor: ShellExecutor,
+    layout: Layout,
+    live: Live,
 ):
     """
     Execute the generated commands.
     """
-    for i in range(len(commands)):
-        try:
-            commands[i].status = "running"
-            layout["tasks"].update(tasks_panel(commands))
+    global trigger_key
 
+    for i in range(len(commands)):
+        with trigger_lock:
+            if trigger_key == "a":
+                abort_requested.set()
+                trigger_key = None
+        if abort_requested.is_set():
+            # Mark this and subsequent commands as aborted
+            for j in range(i, len(commands)):
+                commands[j].status = "aborted"
+            layout["tasks"].update(tasks_panel(commands))
+            live.refresh()
+            break
+
+        commands[i].status = "running"
+        layout["tasks"].update(tasks_panel(commands))
+        live.refresh()
+
+        final_status = "success"  # Assume success initially
+        error_detail = None
+
+        try:
+            # TODO: Ideally, capture stdout/stderr from executor.run
+            # and potentially display it live (more complex)
             executor.run(commands[i].cmd.cmd)
 
-            commands[i].status = "success"
-            layout["tasks"].update(tasks_panel(commands))
+            # --- Check for abort *during* execution ---
+            # (pynput might catch 'a' while executor.run is blocking)
+            with trigger_lock:
+                if trigger_key == "a":
+                    abort_requested.set()
+                    trigger_key = None  # Reset trigger
+            if abort_requested.is_set():
+                final_status = "aborted"
+
         except Exception as e:
-            commands[i].status = "error"
-            layout["tasks"].update(tasks_panel(commands))
-            error = f"\n❌ [bold red]Error executing command '{commands[i].cmd.cmd}':[/bold red] {e}"
-            explanation = _tools_and_explanation(
-                agent.create_context(error, agent.error_prompt, True), layout
-            )
+            # If abort was requested during exception, prioritize abort status
+            if abort_requested.is_set():
+                final_status = "aborted"
+            else:
+                final_status = "error"
+                error_detail = e
 
+        commands[i].status = final_status
+        layout["tasks"].update(tasks_panel(commands))
+
+        # Update thoughts panel only on error
+        if final_status == "error" and error_detail:
+            error_msg = (
+                f"Error executing command '{commands[i].cmd.cmd}': {error_detail}"
+            )
             layout["thoughts"].update(
-                thoughts_panel(
-                    [
-                        f"❌ [bold red]Error:[/bold red] {error}",
-                        f"💬 [bold green]Explanation:[/bold green] {explanation}",
-                    ]
-                )
+                thoughts_panel([f"❌ [bold red]Error:[/bold red] {error_msg}"])
             )
+            # Update trigger status immediately on error
+            layout["triggers"].update(triggers_panel("Error occurred."))
 
-            try:
-                generated_commands = agent.generate_commands(agent.error_command_prompt)
-                commands = [
-                    DisplayCommand(cmd=cmd, status="pending")
-                    for cmd in generated_commands.commands
-                ]
-            except Exception as e:
-                layout["thoughts"].update(
-                    thoughts_panel(
-                        [
-                            f"❌ [bold red]Error, failed to generate commands:[/bold red] {e}"
-                        ]
-                    )
-                )
-                commands = []
+        live.refresh()
 
-            if commands:
-                execute_commands(commands, executor, layout)
+        if final_status == "error" or final_status == "aborted":
+            # If aborted, mark remaining tasks as aborted
+            if final_status == "aborted":
+                for j in range(i + 1, len(commands)):
+                    commands[j].status = "aborted"
+                layout["tasks"].update(tasks_panel(commands))
+                live.refresh()
+            break
 
-        # print("\n\n--- 🧹 [bold]Cleanup[/bold] ---")
-        # cleanup(executor)
+    final_trigger_status = (
+        "Aborted." if abort_requested.is_set() else "Execution finished."
+    )
+    # Avoid overwriting "Error occurred." if that was the last state
+    if commands and commands[-1].status != "error":
+        layout["triggers"].update(triggers_panel(final_trigger_status))
+        live.refresh()
 
 
-def _tools_and_explanation(generator: Generator[str, None, str], layout: Layout) -> str:
+def _tools_and_explanation(
+    generator: Generator[str, None, str], layout: Layout, live: Live
+) -> str:
     """
     Prints live-updating tools and thoughts while building context.
+    Checks for abort signal.
     """
     tools_state = []
-    layout["tools"].update(tools_panel(tools_state))
 
+    explanation = ""
     while True:
+        # Check for abort signal during generation
+        if abort_requested.is_set():
+            explanation = "[Aborted during generation]"
+            break
+
         try:
+            # Use a small timeout or non-blocking check if possible,
+            # but next() will block here until the generator yields.
+            # Abort check relies on 'a' being pressed *before* this point
+            # or during a pause in the generator's execution.
             tool_call = next(generator)
             tools_state.append(tool_call)
             layout["tools"].update(tools_panel(tools_state))
+            live.refresh()
+
         except StopIteration as e:
             explanation = e.value
             break
+        except Exception as e:
+            explanation = f"[Error during generation: {e}]"
+            layout["thoughts"].update(
+                thoughts_panel([f"❌ [bold red]Error:[/bold red] {explanation}"])
+            )
+            break
+
+    if not tools_state:
+        tools_state = ["[dim]No tools used.[/dim]"]
+        layout["tools"].update(tools_panel(tools_state))
+        live.refresh()
 
     return explanation
 
 
-# def cleanup(executor: ShellExecutor):
-#     """
-#     After the generated commands are ran successfully, check that the output is what was expected.
-#     """
-#     explanation = agent.create_context(agent.cleanup_prompt, None, True)
-#     print(f"\n💬 {explanation}")
-#
-#     try:
-#         commands = agent.generate_commands(agent.cleanup_command_prompt)
-#     except Exception as e:
-#         print(f"\n❌ [bold red]Error:[/bold red] Failed to generate commands: {e}")
-#         commands = CommandsResponse(commands=[])
-#
-#     if commands.commands:
-#         execute_commands(commands, executor)
+def wait_for_user(layout: Layout, live: Live, display_commands: list[DisplayCommand]):
+    """
+    Wait for user input to either run or abort the commands.
+    """
+    global trigger_key
+
+    user_action = None
+    while user_action is None:
+        with trigger_lock:
+            if trigger_key:
+                user_action = trigger_key
+                trigger_key = None
+        if user_action:
+            break
+        time.sleep(0.1)
+
+    if user_action == "a" or abort_requested.is_set():
+        layout["thoughts"].update(
+            thoughts_panel(["[bold red]Aborted by user.[/bold red]"])
+        )
+        layout["triggers"].update(triggers_panel("Aborted."))
+        # Mark tasks as aborted
+        for cmd in display_commands:
+            cmd.status = "aborted"
+        layout["tasks"].update(tasks_panel(display_commands))
+        return
+
+    elif user_action == "r":
+        layout["triggers"].update(triggers_panel("Executing..."))
+        live.refresh()
+        execute_commands(display_commands, executor, layout, live)
 
 
 if __name__ == "__main__":
+    abort_requested.clear()
     app()
