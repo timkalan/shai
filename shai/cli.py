@@ -107,7 +107,8 @@ def tasks_panel(commands: list[DisplayCommand]) -> Panel:
         for cmd in commands
     )
     return Panel(
-        Text.from_markup(content, justify="left", overflow="fold"),
+        # Change overflow from "fold" to "ellipsis"
+        Text.from_markup(content, justify="left", overflow="ellipsis"),
         title="📜 Tasks",
     )
 
