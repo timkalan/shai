@@ -1,3 +1,0 @@
-The commands completed without errors. Now, verify that the result matches what the user originally
-requested. If anything is missing, incorrect, or incomplete, explain the issue and suggest any
-follow-up commands needed to fix it.
