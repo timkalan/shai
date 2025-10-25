@@ -1,4 +1,0 @@
-The last command failed with an error. Review the command and the error message carefully.
-Identify what went wrong, correct the mistake, and suggest a revised command that should work.
-If you think some more context is needed, run the necessary tools to gather it.
-

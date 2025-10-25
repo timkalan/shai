@@ -1,21 +1,29 @@
 # shai
 
-Want to get something done in the shell but can't quite remember how? Too shy to ask your coworkers?
-Too deep in the AI sauce to Google it? `shai` has your back.
+Want to get something done in the shell but can't quite remember how? Too shy to
+ask your coworkers? Too deep in the AI sauce to Google it? `shai` has your back.
 
-![Shai Logo](shai.png)
+## Installation
 
-# Setup
+Run the following command in your terminal. This will download the correct
+`shai` binary for your system, make it executable, and move it to
+`/usr/local/bin`.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip3 install -e .
+```sh
+curl -fsSL [https://github.com/timkalan/shai/raw/main/install.sh](https://github.com/timkalan/shai/raw/main/install.sh) | sh
 ```
 
-Copy the `.env.example` file to `.env` and fill it out, I am using `gemini-2.0-flash` with a free API key
-from Google.
+To enable shell integration (for now, zsh only), add this at the end of your
+`.zshrc`
 
-# Usage
+```sh
+export GOOGLE_GENERATIVE_AI_API_KEY=<your-api-key>
+eval "$(shai --zsh-init)"
+```
 
-Just call `shai "prompt"` and let the app guide you.
+and then restart your shell (or `source ~/.zshrc`).
+
+## Usage
+
+Just call `shai` with your prompt and let the magic happen. shai uses the
+`gemini-2.5-flash-lite` model so you can use a free api key.
