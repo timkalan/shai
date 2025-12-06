@@ -29,3 +29,11 @@ and then restart your shell (or `source ~/.zshrc`).
 
 Just call `shai` with your prompt and let the magic happen. shai uses the
 `gemini-2.5-flash-lite` model so you can use a free api key.
+
+## Roadmap
+
+- [ ] **Bash Support**: Add init script and support for Bash shell.
+- [ ] **Explain Mode**: Add a flag to explain the generated command before
+      running it.
+- [ ] **Self Update**: Add a command to upgrade to the latest version
+      automatically.

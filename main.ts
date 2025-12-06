@@ -4,8 +4,6 @@ import env from "./env.ts";
 import z from "zod";
 
 const ZSH_INIT_SCRIPT = `
-# --- shai ZLE Widget (Enter-to-Expand) ---
-
 # This widget re-defines what 'Enter' (accept-line) does.
 shai_enter_to_expand() {
   
@@ -78,8 +76,6 @@ zle -N shai_enter_to_expand
 # Bind the 'Enter' key (^M) to our new widget
 # This hijacks the default 'Enter' behavior.
 bindkey '^M' shai_enter_to_expand
-
-# --- End of shai ZLE Widget ---
 `;
 
 // Check if the user is asking for the init script
@@ -95,11 +91,15 @@ const CommandSchema = z.object({
 });
 
 const generateCommand = async (userPrompt: string) => {
+  const os = Deno.build.os === "darwin" ? "macOS" : Deno.build.os;
+  const shellPath = Deno.env.get("SHELL");
+  const shell = shellPath ? shellPath.split("/").pop() : "zsh";
+
   const { object } = await generateObject({
     model: google(env.GEMINI_MODEL),
     schema: CommandSchema,
     system:
-      "Generate a system command and its arguments as a list, based on user input. Only include safe, non-destructive commands.",
+      `You are a command-line assistant running on ${os} using ${shell}. Generate a single, valid system command string based on the user's request. Ensure the command is syntactically correct for ${shell} on ${os}. Only include safe, non-destructive commands.`,
     messages: [
       {
         role: "user",
