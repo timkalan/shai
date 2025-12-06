@@ -22,6 +22,10 @@ echo "Compiling for Linux (x64)..."
 deno compile --allow-net --allow-env --target x86_64-unknown-linux-gnu \
   -o ./build/shai-linux-x64 main.ts
 
+echo "Compiling for Linux (arm64)..."
+deno compile --allow-net --allow-env --target aarch64-unknown-linux-gnu \
+  -o ./build/shai-linux-arm64 main.ts
+
 echo "All builds complete."
 
 # --- CREATE GITHUB RELEASE & UPLOAD ---

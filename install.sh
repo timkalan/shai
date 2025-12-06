@@ -12,7 +12,16 @@ set -e # Exit on any error
 
 # --- START: Customizeable Variables ---
 REPO="timkalan/shai"
-VERSION="v0.1.0" # Make sure this matches your GitHub Release tag
+# Attempt to fetch the latest version from GitHub API
+# If this fails or if you want a specific version, you can override it here.
+LATEST_VERSION=$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+if [ -z "$LATEST_VERSION" ]; then
+  echo "Warning: Could not fetch latest version from GitHub. Falling back to default."
+  VERSION="v0.1.0" 
+else
+  VERSION="$LATEST_VERSION"
+fi
 # --- END: Customizeable Variables ---
 
 INSTALL_DIR="/usr/local/bin"

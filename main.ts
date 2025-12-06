@@ -15,13 +15,41 @@ shai_enter_to_expand() {
     # It's a shai command. We want to *transform* it, not execute it yet.
     local prompt=\${BUFFER#shai }
     
+    # Define a spinner function for animation
+    _shai_spinner() {
+      # Hide cursor
+      printf "\\e[?25l" > /dev/tty
+      local spinner="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+      while true; do
+        for i in {1..10}; do
+          # Print to /dev/tty to show to user, cursor return \\r to overwrite, \\e[K to clear line
+          printf "\\r\\e[K\\e[36m%s\\e[0m Generating..." "\${spinner[\$i]}" > /dev/tty
+          sleep 0.1
+        done
+      done
+    }
+
+    # Start the spinner in the background
+    # Use &| to background and disown immediately, suppressing job control messages
+    _shai_spinner &|
+    local spinner_pid=$!
+
     # Run the shai tool and capture the command (stdout)
     # Errors (stderr) will go to /dev/tty to be seen
     local new_command
     new_command=$(command shai "$prompt" 2>/dev/tty)
     
+    # Kill the spinner
+    kill "$spinner_pid" 2>/dev/null
+    
+    # Clear the spinner line and restore cursor
+    printf "\\r\\e[K\\e[?25h" > /dev/tty
+    
     # Check if we got a command back
     if [[ -n $new_command ]]; then
+      # Save the original shai command to history
+      print -s "$BUFFER"
+
       # SUCCESS: Replace the buffer with the new command
       BUFFER=$new_command
       CURSOR=\${#new_command}
@@ -61,9 +89,9 @@ if (Deno.args[0] === "--zsh-init") {
 }
 
 const CommandSchema = z.object({
-  command: z.string().describe(
-    "A safe system command to execute based on user input",
-  ),
+  command: z
+    .string()
+    .describe("A safe system command to execute based on user input"),
 });
 
 const generateCommand = async (userPrompt: string) => {

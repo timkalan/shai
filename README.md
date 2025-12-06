@@ -13,10 +13,12 @@ Run the following command in your terminal. This will download the correct
 curl -fsSL https://github.com/timkalan/shai/raw/main/install.sh | sh
 ```
 
-To enable shell integration (for now, zsh only), add this at the end of your
-`.zshrc`
+To enable shell integration (for now, `zsh` only), add this at the end of your
+`.zshrc`. Note that currently, you need to have `GOOGLE_GENERATIVE_AI_API_KEY`
+in your environment.
 
 ```sh
+# or just use a .env file
 export GOOGLE_GENERATIVE_AI_API_KEY=<your-api-key>
 eval "$(shai --zsh-init)"
 ```
