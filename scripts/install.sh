@@ -5,15 +5,13 @@
 # This script downloads the correct binary from GitHub Releases
 # and installs it to /usr/local/bin.
 #
-# Usage: curl -fsSL https://github.com/timkalan/shai/raw/main/install.sh | sh
+# Usage: curl -fsSL https://github.com/timkalan/shai/raw/main/scripts/install.sh | sh
 #
 
 set -e # Exit on any error
 
-# --- START: Customizeable Variables ---
 REPO="timkalan/shai"
 # Attempt to fetch the latest version from GitHub API
-# If this fails or if you want a specific version, you can override it here.
 LATEST_VERSION=$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_VERSION" ]; then
@@ -22,13 +20,12 @@ if [ -z "$LATEST_VERSION" ]; then
 else
   VERSION="$LATEST_VERSION"
 fi
-# --- END: Customizeable Variables ---
 
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="shai"
 TARGET_FILE="$INSTALL_DIR/$BINARY_NAME"
 
-# 1. Detect OS and Architecture
+# Detect OS and Architecture
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 
@@ -50,11 +47,11 @@ case $ARCH in
     ;;
 esac
 
-# 2. Construct Download URL
+# Construct Download URL
 RELEASE_BINARY_NAME="shai-${OS_NAME}-${ARCH_NAME}"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$RELEASE_BINARY_NAME"
 
-# 3. Download Binary
+# Download Binary
 echo "Downloading shai ($RELEASE_BINARY_NAME)..."
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
@@ -65,7 +62,7 @@ else
   exit 1
 fi
 
-# 4. Install Binary
+# Install Binary
 echo "Installing to $INSTALL_DIR..."
 chmod +x "/tmp/$BINARY_NAME"
 
@@ -77,7 +74,7 @@ else
   mv "/tmp/$BINARY_NAME" "$TARGET_FILE"
 fi
 
-# 5. Print Next Steps
+# Print Next Steps
 echo ""
 echo "✅ shai was installed successfully to $TARGET_FILE"
 echo ""

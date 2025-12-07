@@ -10,7 +10,7 @@ Run the following command in your terminal. This will download the correct
 `/usr/local/bin`.
 
 ```sh
-curl -fsSL https://github.com/timkalan/shai/raw/main/install.sh | sh
+curl -fsSL https://github.com/timkalan/shai/raw/main/scripts/install.sh | sh
 ```
 
 To enable shell integration (for now, `zsh` only), add this at the end of your

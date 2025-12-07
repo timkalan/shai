@@ -6,13 +6,13 @@ import z from "zod";
 const ZSH_INIT_SCRIPT = `
 # This widget re-defines what 'Enter' (accept-line) does.
 shai_enter_to_expand() {
-  
+
   # Check if the current line buffer starts with "shai "
   if [[ $BUFFER == shai\\ * ]]; then
-    
+
     # It's a shai command. We want to *transform* it, not execute it yet.
     local prompt=\${BUFFER#shai }
-    
+
     # Define a spinner function for animation
     _shai_spinner() {
       # Hide cursor
@@ -98,8 +98,7 @@ const generateCommand = async (userPrompt: string) => {
   const { object } = await generateObject({
     model: google(env.GEMINI_MODEL),
     schema: CommandSchema,
-    system:
-      `You are a command-line assistant running on ${os} using ${shell}. Generate a single, valid system command string based on the user's request. Ensure the command is syntactically correct for ${shell} on ${os}. Only include safe, non-destructive commands.`,
+    system: `You are a command-line assistant running on ${os} using ${shell}. Generate a single, valid system command string based on the user's request. Ensure the command is syntactically correct for ${shell} on ${os}. Only include safe, non-destructive commands.`,
     messages: [
       {
         role: "user",

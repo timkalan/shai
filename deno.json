@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "shai": "deno run --allow-env --env-file=.env --allow-net --allow-run main.ts"
+    "shai": "deno run --allow-env --env-file=.env --allow-net --allow-run src/main.ts"
   },
   "imports": {
     "@ai-sdk/google": "npm:@ai-sdk/google@^2.0.23",
