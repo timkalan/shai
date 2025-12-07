@@ -2,16 +2,15 @@
 #
 # shai - Installer Script
 #
-# This script downloads the correct binary from GitHub Releases
-# and installs it to /usr/local/bin.
-#
 # Usage: curl -fsSL https://github.com/timkalan/shai/raw/main/scripts/install.sh | sh
 #
 
 set -e # Exit on any error
 
 REPO="timkalan/shai"
-# Attempt to fetch the latest version from GitHub API
+
+# Fetch Version
+echo "Checking latest version..."
 LATEST_VERSION=$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_VERSION" ]; then
@@ -25,64 +24,71 @@ INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="shai"
 TARGET_FILE="$INSTALL_DIR/$BINARY_NAME"
 
-# Detect OS and Architecture
+# Detect OS/Arch
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 
 case $OS in
   linux) OS_NAME="linux" ;;
   darwin) OS_NAME="macos" ;;
-  *)
-    echo "Error: Unsupported OS '$OS'" >&2
-    exit 1
-    ;;
+  *) echo "Error: Unsupported OS '$OS'" >&2; exit 1 ;;
 esac
 
 case $ARCH in
   x86_64) ARCH_NAME="x64" ;;
   aarch64 | arm64) ARCH_NAME="arm64" ;;
-  *)
-    echo "Error: Unsupported architecture '$ARCH'" >&2
-    exit 1
-    ;;
+  *) echo "Error: Unsupported architecture '$ARCH'" >&2; exit 1 ;;
 esac
 
-# Construct Download URL
 RELEASE_BINARY_NAME="shai-${OS_NAME}-${ARCH_NAME}"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$RELEASE_BINARY_NAME"
 
-# Download Binary
-echo "Downloading shai ($RELEASE_BINARY_NAME)..."
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
-elif command -v wget >/dev/null 2>&1; then
-  wget -qO "/tmp/$BINARY_NAME" "$DOWNLOAD_URL"
+# Download
+echo "Downloading $RELEASE_BINARY_NAME from $VERSION..."
+
+# Check if the URL is valid (HEAD request) before trying to download
+if curl --output /dev/null --silent --head --fail "$DOWNLOAD_URL"; then
+    # URL exists
+    :
 else
-  echo "Error: You need either curl or wget to install shai." >&2
-  exit 1
+    echo "Error: The release binary '$RELEASE_BINARY_NAME' was not found at:"
+    echo "$DOWNLOAD_URL"
+    exit 1
 fi
 
-# Install Binary
+if command -v curl >/dev/null 2>&1; then
+  curl -L --progress-bar "$DOWNLOAD_URL" -o "/tmp/$BINARY_NAME"
+elif command -v wget >/dev/null 2>&1; then
+  wget -q --show-progress -O "/tmp/$BINARY_NAME" "$DOWNLOAD_URL"
+else
+  echo "Error: You need curl or wget." >&2; exit 1
+fi
+
+# Install
 echo "Installing to $INSTALL_DIR..."
 chmod +x "/tmp/$BINARY_NAME"
 
-# Use sudo if $INSTALL_DIR is not writable by the current user
 if [ ! -w "$INSTALL_DIR" ]; then
-  echo "sudo password may be required to install to $INSTALL_DIR"
-  sudo mv "/tmp/$BINARY_NAME" "$TARGET_FILE"
+  echo "Sudo permissions required to move binary to $INSTALL_DIR"
+  
+  if [ -t 0 ]; then
+      sudo mv "/tmp/$BINARY_NAME" "$TARGET_FILE"
+  else
+      # If not running in a terminal (piped), try to open /dev/tty
+      sudo mv "/tmp/$BINARY_NAME" "$TARGET_FILE" < /dev/tty
+  fi
 else
   mv "/tmp/$BINARY_NAME" "$TARGET_FILE"
 fi
 
-# Print Next Steps
 echo ""
-echo "✅ shai was installed successfully to $TARGET_FILE"
+echo "✅ shai installed successfully to $TARGET_FILE"
 echo ""
 echo "--- IMPORTANT: Next Steps ---"
 echo ""
 echo "shai requires a Google AI API key to function."
 echo "1. Get your key from Google AI Studio."
-echo "2. Add the key to your shell's startup file (e.g., ~/.zshrc)."
+echo "2. Add the key to your shell's startup file (e.g., in your .env or ~/.zshrc)."
 echo ""
 echo "   # Add these two lines to ~/.zshrc:"
 echo "   export GOOGLE_GENERATIVE_AI_API_KEY=\"YOUR_API_KEY_GOES_HERE\""
