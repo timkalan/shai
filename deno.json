@@ -1,6 +1,9 @@
 {
   "tasks": {
-    "shai": "deno run --allow-env --env-file=.env --allow-net src/main.ts"
+    "shai": "deno run --allow-env --env-file=.env --allow-net src/main.ts",
+    "compile": "deno compile --allow-net --allow-env -o shai src/main.ts",
+    "all": "deno fmt && deno lint --fix && deno check src/main.ts",
+    "install": "deno task compile && sudo cp shai /usr/local/bin/shai && echo '✅ Installed! Run this to reload widget: \neval \"$(shai --zsh-init)\"'"
   },
   "imports": {
     "@ai-sdk/google": "npm:@ai-sdk/google@^2.0.23",

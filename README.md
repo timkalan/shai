@@ -34,22 +34,23 @@ Just call `shai` with your prompt and let the magic happen. shai uses the
 
 ### Testing Widget Changes
 
-Since shai's magic is in the Zsh widget (the Enter key interception), you need to reload it when making changes to `src/zsh-init.ts`:
+Since shai's magic is in the Zsh widget (the Enter key interception), you need
+to reload it when making changes to `src/zsh-init.ts`:
 
 ```bash
-# 1. Rebuild the binary
-deno compile --allow-net --allow-env -o shai src/main.ts
-
-# 2. Quick reload widget in current shell (for testing)
-eval "$(./shai --zsh-init)"
+# Quick install and reload for development
+deno task install && eval "$(shai --zsh-init)"
 
 # Now test it:
 shai list files in current directory
-
-# 3. To permanently update, edit your ~/.zshrc and replace the old widget section
-# Find the section between "# This widget re-defines..." and "bindkey '^M' shai_enter_to_expand"
-./shai --zsh-init >> ~/.zshrc  # Or manually replace the section
 ```
+
+**Available tasks:**
+
+- `deno task shai <prompt>` - Run locally without compiling
+- `deno task install` - Compile and install to /usr/local/bin
+- `deno task compile` - Just compile the binary
+- `deno task all` - Format, lint, and type-check (run before pushing)
 
 ## Roadmap
 

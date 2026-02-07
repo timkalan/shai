@@ -47,3 +47,6 @@ yarn-error.log*
 # Windows
 Thumbs.db
 desktop.ini
+
+# binary
+shai

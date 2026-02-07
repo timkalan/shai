@@ -1,85 +1,69 @@
 export const ZSH_INIT_SCRIPT = `
 # This widget re-defines what 'Enter' (accept-line) does.
 shai_enter_to_expand() {
+  # Early return: not a shai command - just execute normally
+  [[ $BUFFER != shai\\ * ]] && { zle accept-line; return }
 
-  # Check if the current line buffer starts with "shai "
-  if [[ $BUFFER == shai\\ * ]]; then
+  # Extract the prompt and save original buffer
+  local prompt="\${BUFFER#shai }"
+  local original_buffer="$BUFFER"
 
-    # It's a shai command. We want to *transform* it, not execute it yet.
-    local prompt=\${BUFFER#shai }
-    local original_buffer="$BUFFER"
+  # Create temp file for command output
+  local tmpfile=$(mktemp)
+  local shai_pid
+  local canceled=0
 
-    # Create a temp file to capture the command output
-    local tmpfile=$(mktemp)
+  # Hide cursor during animation
+  printf "\\e[?25l" > /dev/tty
 
-    # Run shai in the background, capturing stdout to temp file
-    # stderr goes to /dev/tty so errors are visible
-    (command shai "$prompt" > "$tmpfile" 2>/dev/tty) &|
-    local shai_pid=$!
+  # Run shai in background (disowned, independent of shell job control)
+  (command shai "$prompt" > "$tmpfile" 2>/dev/tty) &|
+  shai_pid=$!
 
-    # Wave spinner animation (rises and falls)
-    local spin_idx=1
+  # Unified cleanup handler for all exit scenarios
+  # This runs on: normal completion, Ctrl+C, or unexpected termination
+  local -a cleanup_cmds=(
+    'canceled=1'
+    'kill $shai_pid 2>/dev/null'
+    'wait $shai_pid 2>/dev/null'
+    'printf "\\e[?25h" > /dev/tty'
+    '[[ -f "$tmpfile" ]] && rm -f "$tmpfile"'
+  )
+  trap "\${(j.;.)cleanup_cmds}" EXIT INT TERM
 
-    # Hide cursor during animation
-    printf "\\e[?25l" > /dev/tty
+  # Show wave spinner while shai is running
+  local spin_idx=1
+  local -a wave_frames=("▂▄▆█" "▃▅▇▓" "▄▆█▒" "▅▇▓░" "▆█▒░" "▇▓░▁" "█▒░▂" "▓░▁▃")
 
-    # Ensure we always cleanup on exit (cursor restore and temp file deletion)
-    trap 'printf "\\e[?25h" > /dev/tty; [[ -f "$tmpfile" ]] && rm -f "$tmpfile"' EXIT INT TERM
+  while kill -0 $shai_pid 2>/dev/null && [[ $canceled -eq 0 ]]; do
+    BUFFER="\${wave_frames[$spin_idx]}"
+    zle redisplay
+    spin_idx=$((spin_idx % 8 + 1))
+    sleep 0.15
+  done
 
-    # While shai is still running, show spinner
-    while kill -0 $shai_pid 2>/dev/null; do
-      # Wave pattern rising and falling
-      case $spin_idx in
-        1) BUFFER=" ▂▄▆█" ;;
-        2) BUFFER=" ▃▅▇▓" ;;
-        3) BUFFER=" ▄▆█▒" ;;
-        4) BUFFER=" ▅▇▓░" ;;
-        5) BUFFER=" ▆█▒░" ;;
-        6) BUFFER=" ▇▓░▁" ;;
-        7) BUFFER=" █▒░▂" ;;
-        8) BUFFER=" ▓░▁▃" ;;
-      esac
-      zle redisplay
+  # Handle cancellation (Ctrl+C pressed)
+  if [[ $canceled -eq 1 ]]; then
+    BUFFER="$original_buffer"
+    CURSOR=\${#original_buffer}
+    zle redisplay
+    return
+  fi
 
-      # Move to next frame
-      spin_idx=$((spin_idx + 1))
-      if [[ $spin_idx -gt 8 ]]; then
-        spin_idx=1
-      fi
+  # Read generated command from temp file
+  local new_command=""
+  [[ -f "$tmpfile" ]] && new_command=$(cat "$tmpfile")
 
-      # Animation delay (0.15 seconds for smoother wave)
-      sleep 0.15
-    done
-
-    # Read the generated command
-    local new_command=""
-    if [[ -f "$tmpfile" ]]; then
-      new_command=$(cat "$tmpfile")
-    fi
-
-    # Check if we got a command back and shai succeeded
-    if [[ -n $new_command ]]; then
-      # Save the original shai command to history
-      print -s "$original_buffer"
-
-      # SUCCESS: Replace the buffer with the new command
-      BUFFER=$new_command
-      CURSOR=\${#new_command}
-
-      # Just redisplay the prompt. DO NOT execute.
-      zle redisplay
-    else
-      # FAILURE: The shai command failed (e.g., API error).
-      # Restore original buffer and execute it so user sees the error
-      BUFFER="$original_buffer"
-      zle accept-line
-    fi
+  # Handle result
+  if [[ -n $new_command ]]; then
+    # Success: save original to history, show generated command
+    print -s "$original_buffer"
+    BUFFER=$new_command
+    CURSOR=\${#new_command}
+    zle redisplay
   else
-    # The line *doesn't* start with "shai".
-    # This means it's either a normal command, OR it's the *result*
-    # of our transformation (e.g., "docker ps").
-    #
-    # So, call the ORIGINAL 'Enter' action to run it.
+    # Failure: restore original and execute to show error
+    BUFFER="$original_buffer"
     zle accept-line
   fi
 }
@@ -88,6 +72,5 @@ shai_enter_to_expand() {
 zle -N shai_enter_to_expand
 
 # Bind the 'Enter' key (^M) to our new widget
-# This hijacks the default 'Enter' behavior.
 bindkey '^M' shai_enter_to_expand
 `;
