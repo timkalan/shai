@@ -1,0 +1,51 @@
+---
+name: CI
+
+"on":
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.x"
+
+      - name: Format Check
+        run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
+
+      - name: Type Check
+        run: deno check src/main.ts
+
+  build:
+    name: Build Binary
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.x"
+
+      - name: Compile Binary
+        run: deno compile --allow-net --allow-env -o shai src/main.ts
+
+      - name: Verify Binary
+        run: |
+          echo "Binary info:"
+          ls -lh shai
+          file shai
+          echo "Testing --zsh-init flag:"
+          ./shai --zsh-init | head -5
