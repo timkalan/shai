@@ -39,7 +39,7 @@ shai_enter_to_expand() {
     BUFFER="\${wave_frames[$spin_idx]}"
     zle redisplay
     spin_idx=$((spin_idx % 8 + 1))
-    sleep 0.15
+    sleep 0.1
   done
 
   # Handle cancellation (Ctrl+C pressed)
@@ -62,9 +62,10 @@ shai_enter_to_expand() {
     CURSOR=\${#new_command}
     zle redisplay
   else
-    # Failure: restore original and execute to show error
+    # Failure: restore original buffer and cursor
     BUFFER="$original_buffer"
-    zle accept-line
+    CURSOR=\${#original_buffer}
+    zle redisplay
   fi
 }
 
