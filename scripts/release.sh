@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-VERSION="v0.1.0"
-NOTES="First release of shai!"
+VERSION="v0.1.1"
+NOTES="Added a nice animation and made shai public!"
 
 echo "Cleaning up old builds..."
 rm -rf ./build

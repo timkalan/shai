@@ -30,8 +30,31 @@ and then restart your shell (or `source ~/.zshrc`).
 Just call `shai` with your prompt and let the magic happen. shai uses the
 `gemini-2.5-flash-lite` model so you can use a free api key.
 
+## Development
+
+### Testing Widget Changes
+
+Since shai's magic is in the Zsh widget (the Enter key interception), you need to reload it when making changes to `src/zsh-init.ts`:
+
+```bash
+# 1. Rebuild the binary
+deno compile --allow-net --allow-env -o shai src/main.ts
+
+# 2. Quick reload widget in current shell (for testing)
+eval "$(./shai --zsh-init)"
+
+# Now test it:
+shai list files in current directory
+
+# 3. To permanently update, edit your ~/.zshrc and replace the old widget section
+# Find the section between "# This widget re-defines..." and "bindkey '^M' shai_enter_to_expand"
+./shai --zsh-init >> ~/.zshrc  # Or manually replace the section
+```
+
 ## Roadmap
 
+- [ ] **History**: Give shai access to more context
+- [ ] **Models**: We should allow our users to pick their models/providers
 - [ ] **Bash Support**: Add init script and support for Bash shell.
 - [ ] **Explain Mode**: Add a flag to explain the generated command before
       running it.

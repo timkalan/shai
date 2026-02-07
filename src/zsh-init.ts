@@ -7,41 +7,60 @@ shai_enter_to_expand() {
 
     # It's a shai command. We want to *transform* it, not execute it yet.
     local prompt=\${BUFFER#shai }
+    local original_buffer="$BUFFER"
 
-    # Define a spinner function for animation
-    _shai_spinner() {
-      # Hide cursor
-      printf "\\e[?25l" > /dev/tty
-      local spinner="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-      while true; do
-        for i in {1..10}; do
-          # Print to /dev/tty to show to user, cursor return \\r to overwrite, \\e[K to clear line
-          printf "\\r\\e[K\\e[36m%s\\e[0m Generating..." "\${spinner[\$i]}" > /dev/tty
-          sleep 0.1
-        done
-      done
-    }
+    # Create a temp file to capture the command output
+    local tmpfile=$(mktemp)
 
-    # Start the spinner in the background
-    # Use &| to background and disown immediately, suppressing job control messages
-    _shai_spinner &|
-    local spinner_pid=$!
+    # Run shai in the background, capturing stdout to temp file
+    # stderr goes to /dev/tty so errors are visible
+    (command shai "$prompt" > "$tmpfile" 2>/dev/tty) &|
+    local shai_pid=$!
 
-    # Run the shai tool and capture the command (stdout)
-    # Errors (stderr) will go to /dev/tty to be seen
-    local new_command
-    new_command=$(command shai "$prompt" 2>/dev/tty)
+    # Wave spinner animation (rises and falls)
+    local spin_idx=1
 
-    # Kill the spinner
-    kill "$spinner_pid" 2>/dev/null
+    # Hide cursor during animation
+    printf "\\e[?25l" > /dev/tty
 
-    # Clear the spinner line and restore cursor
-    printf "\\r\\e[K\\e[?25h" > /dev/tty
+    # Ensure we always cleanup on exit (cursor restore and temp file deletion)
+    trap 'printf "\\e[?25h" > /dev/tty; [[ -f "$tmpfile" ]] && rm -f "$tmpfile"' EXIT INT TERM
 
-    # Check if we got a command back
+    # While shai is still running, show spinner
+    while kill -0 $shai_pid 2>/dev/null; do
+      # Wave pattern rising and falling
+      case $spin_idx in
+        1) BUFFER=" ▂▄▆█" ;;
+        2) BUFFER=" ▃▅▇▓" ;;
+        3) BUFFER=" ▄▆█▒" ;;
+        4) BUFFER=" ▅▇▓░" ;;
+        5) BUFFER=" ▆█▒░" ;;
+        6) BUFFER=" ▇▓░▁" ;;
+        7) BUFFER=" █▒░▂" ;;
+        8) BUFFER=" ▓░▁▃" ;;
+      esac
+      zle redisplay
+
+      # Move to next frame
+      spin_idx=$((spin_idx + 1))
+      if [[ $spin_idx -gt 8 ]]; then
+        spin_idx=1
+      fi
+
+      # Animation delay (0.15 seconds for smoother wave)
+      sleep 0.15
+    done
+
+    # Read the generated command
+    local new_command=""
+    if [[ -f "$tmpfile" ]]; then
+      new_command=$(cat "$tmpfile")
+    fi
+
+    # Check if we got a command back and shai succeeded
     if [[ -n $new_command ]]; then
       # Save the original shai command to history
-      print -s "$BUFFER"
+      print -s "$original_buffer"
 
       # SUCCESS: Replace the buffer with the new command
       BUFFER=$new_command
@@ -51,8 +70,8 @@ shai_enter_to_expand() {
       zle redisplay
     else
       # FAILURE: The shai command failed (e.g., API error).
-      # In this case, just run the original "shai ..." command
-      # so the user can see the error output from stderr.
+      # Restore original buffer and execute it so user sees the error
+      BUFFER="$original_buffer"
       zle accept-line
     fi
   else
