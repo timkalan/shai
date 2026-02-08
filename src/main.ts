@@ -68,8 +68,7 @@ if (parsed["zsh-init"]) {
 }
 
 // Determine if history should be used
-const useHistory = !parsed["no-history"] &&
-  env.SHAI_HISTORY_DISABLE !== "true";
+const useHistory = !parsed["no-history"] && env.SHAI_HISTORY_DISABLE !== "true";
 
 const userPrompt = parsed._.join(" ");
 
@@ -87,13 +86,14 @@ try {
 
   // Debug output
   if (parsed.debug) {
-    console.error(
-      `History: ${
-        historyContext.length > 0
-          ? `loaded ${historyContext.length} commands`
-          : "unavailable"
-      }`,
-    );
+    if (historyContext.length > 0) {
+      console.error(`shai: loaded ${historyContext.length} history commands`);
+      historyContext.forEach((cmd, i) => {
+        console.error(`  ${i + 1}. ${cmd}`);
+      });
+    } else {
+      console.error("shai: history unavailable");
+    }
   }
 
   const result = await generateCommand(userPrompt, historyContext);
