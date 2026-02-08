@@ -17,7 +17,8 @@ shai_enter_to_expand() {
   printf "\\e[?25l" > /dev/tty
 
   # Run shai in background (disowned, independent of shell job control)
-  (command shai "$prompt" > "$tmpfile" 2>/dev/tty) &|
+  # Use \${=prompt} to split the prompt into separate arguments for flags
+  (command shai \${=prompt} > "$tmpfile" 2>/dev/tty) &|
   shai_pid=$!
 
   # Unified cleanup handler for all exit scenarios

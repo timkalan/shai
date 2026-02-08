@@ -1,10 +1,16 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/cli@1": "1.0.24",
     "npm:@ai-sdk/google@^2.0.23": "2.0.23_zod@4.1.12",
     "npm:@t3-oss/env-core@~0.13.8": "0.13.8",
     "npm:ai@^5.0.76": "5.0.76_zod@4.1.12",
     "npm:zod@^4.1.12": "4.1.12"
+  },
+  "jsr": {
+    "@std/cli@1.0.24": {
+      "integrity": "b655a5beb26aa94f98add6bc8889f5fb9bc3ee2cc3fc954e151201f4c4200a5e"
+    }
   },
   "npm": {
     "@ai-sdk/gateway@2.0.0_zod@4.1.12": {
@@ -73,6 +79,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@std/cli@1",
       "npm:@ai-sdk/google@^2.0.23",
       "npm:@t3-oss/env-core@~0.13.8",
       "npm:ai@^5.0.76",

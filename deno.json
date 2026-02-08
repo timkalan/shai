@@ -1,13 +1,14 @@
 {
   "tasks": {
-    "shai": "deno run --allow-env --env-file=.env --allow-net src/main.ts",
-    "compile": "deno compile --allow-net --allow-env -o shai src/main.ts",
+    "shai": "deno run --allow-env --env-file=.env --allow-net --allow-read src/main.ts",
+    "compile": "deno compile --allow-net --allow-env --allow-read -o shai src/main.ts",
     "all": "deno fmt && deno lint --fix && deno check src/main.ts",
     "install": "deno task compile && sudo cp shai /usr/local/bin/shai && echo '✅ Installed! Run this to reload widget: \neval \"$(shai --zsh-init)\"'"
   },
   "imports": {
     "@ai-sdk/google": "npm:@ai-sdk/google@^2.0.23",
     "@t3-oss/env-core": "npm:@t3-oss/env-core@^0.13.8",
+    "@std/cli/parse-args": "jsr:@std/cli@^1.0.0/parse-args",
     "ai": "npm:ai@^5.0.76",
     "zod": "npm:zod@^4.1.12"
   }
