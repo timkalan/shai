@@ -40,7 +40,7 @@ jobs:
           deno-version: "2.x"
 
       - name: Compile Binary
-        run: deno compile --allow-net --allow-env -o shai src/main.ts
+        run: deno compile --allow-net --allow-env --allow-read -o shai src/main.ts
 
       - name: Verify Binary
         run: |

@@ -30,22 +30,22 @@ jobs:
 
       - name: Compile for macOS (Apple Silicon)
         run: |
-          deno compile --allow-net --allow-env --target aarch64-apple-darwin \
+          deno compile --allow-net --allow-env --allow-read --target aarch64-apple-darwin \
             -o ./build/shai-macos-arm64 src/main.ts
 
       - name: Compile for macOS (Intel)
         run: |
-          deno compile --allow-net --allow-env --target x86_64-apple-darwin \
+          deno compile --allow-net --allow-env --allow-read --target x86_64-apple-darwin \
             -o ./build/shai-macos-x64 src/main.ts
 
       - name: Compile for Linux (x64)
         run: |
-          deno compile --allow-net --allow-env --target x86_64-unknown-linux-gnu \
+          deno compile --allow-net --allow-env --allow-read --target x86_64-unknown-linux-gnu \
             -o ./build/shai-linux-x64 src/main.ts
 
       - name: Compile for Linux (arm64)
         run: |
-          deno compile --allow-net --allow-env --target aarch64-unknown-linux-gnu \
+          deno compile --allow-net --allow-env --allow-read --target aarch64-unknown-linux-gnu \
             -o ./build/shai-linux-arm64 src/main.ts
 
       - name: Create GitHub Release
